@@ -1,4 +1,5 @@
 import express from 'express';
+import { error } from 'node:console';
 
 const app = express();
 const PORT = 3000;
@@ -53,6 +54,41 @@ app.post('/tasks', (req, res) => {
     tasks.push(newTask);
 
     res.status(201).json({ message: 'Task created successfully.', task: newTask })
+})
+
+app.put('/tasks/:id', (req, res) => {
+    const id = Number(req.params.id);
+    const task = tasks.find(t => t.id === id);
+
+    if (!task) {
+        return res.status(404).json({ error: `Task with id (${id}) not found.` })
+    }
+
+    const { title, done } = req.body;
+
+    if (title !== undefined && (typeof title !== 'string' || title.trim() === '')) {
+        return res.status(400).json({ error: 'Title must not be empty' });
+    }
+    if (done !== undefined && typeof done !== 'boolean') {
+        return res.status(400).json({ error: 'Done must be a boolean' });
+    }
+
+    if (title !== undefined) task.title = title;
+    if (done !== undefined) task.done = done;
+
+    res.status(200).json({ message: 'Task updated successfully.', task })
+})
+
+app.delete('/tasks/:id', (req, res) => {
+    const id = Number(req.params.id);
+    const index = tasks.findIndex(t => t.id === id);
+
+    if (index === -1) {
+        return res.status(404).json({ error: `Task with id (${id}) not found` });
+    }
+
+    tasks.splice(index, 1);
+    res.status(204).send();
 })
 
 app.get('/health', (req, res) => {
