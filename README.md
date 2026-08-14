@@ -19,7 +19,8 @@ Stack is not stricted by FlyRank, this is the stack I will be using.
 
 | Code | Week | Task | Status | Folder |
 |------|------|------|--------|--------|
-| BE-01 | W2.A1 | CRUD API | 🚧 In progress | [`/BE-01`](./BE-01) |
+| BE-01 | W2.A1 | CRUD API | ✅ Complete | [`/BE-01`](./BE-01) |
+| BE-02 | W3.A2 | Connecting to the database | 🚧 In progress | [`/BE-02`](./BE-02) |
 
 *(Table updated as new tasks are completed.)*
 
@@ -32,6 +33,7 @@ flyrank-internship/
 │   ├── README.md
 │   ├── src/
 │   └── package.json
+├── BE-02/
 └── ...
 ```
 
