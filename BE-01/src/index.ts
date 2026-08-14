@@ -1,10 +1,23 @@
 import express from 'express';
-import { error } from 'node:console';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+import YAML from 'yaml';
+import swaggerUi from 'swagger-ui-express';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const openapiFile = fs.readFileSync(path.join(__dirname, 'openapi.yaml'), 'utf8');
+const openapiSpec = YAML.parse(openapiFile);
 
 const app = express();
 const PORT = 3000;
 
 app.use(express.json())
+
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(openapiSpec));
 
 interface Task {
     'id': number,
