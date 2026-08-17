@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { db } from "../db.js";
 
 interface Task {
     'id': number,
@@ -15,18 +16,19 @@ const tasks: Task[] = [
 let nextId = 4;
 
 const getAllTasks = (req: Request, res: Response) => {
-    res.status(200).json({ tasks: tasks })
+    const data = db.prepare('SELECT * FROM tasks').all();
+    res.status(200).json({ tasks: data })
 }
 
 const getTask = (req: Request, res: Response) => {
     const id = Number(req.params.id);
-    const task = tasks.find(t => t.id === id)
+    const data = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
 
-    if (!task) {
+    if (!data) {
         res.status(404).json({ error: `Task with id (${id}) not found.` })
     }
 
-    res.status(200).json({ task })
+    res.status(200).json({ data })
 }
 
 const createTask = (req: Request, res: Response) => {
