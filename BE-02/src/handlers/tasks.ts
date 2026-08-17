@@ -77,7 +77,7 @@ const deleteTask = (req: Request, res: Response) => {
     const id = Number(req.params.id);
     const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
 
-    if (task === -1) {
+    if (!task) {
         return res.status(404).json({ error: `Task with id (${id}) not found` });
     }
 
