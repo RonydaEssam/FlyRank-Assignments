@@ -25,7 +25,7 @@ const getTask = (req: Request, res: Response) => {
     const data = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
 
     if (!data) {
-        res.status(404).json({ error: `Task with id (${id}) not found.` })
+        return res.status(404).json({ error: `Task with id (${id}) not found.` })
     }
 
     res.status(200).json({ data })
@@ -35,11 +35,13 @@ const createTask = (req: Request, res: Response) => {
     const { title } = req.body;
 
     if (!title || title.trim() === '' || typeof title !== 'string') {
-        res.status(400).json({ error: 'Title is required and must not be empty.' })
+        return res.status(400).json({ error: 'Title is required and must not be empty.' })
     }
 
-    const newTask: Task = { id: nextId++, title, done: false };
-    tasks.push(newTask);
+    const insert = db.prepare('INSERT INTO tasks (title, done) VALUES (?, ?)');
+    const result = insert.run(title, 0);
+
+    const newTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(result.lastInsertRowid)
 
     res.status(201).json({ message: 'Task created successfully.', task: newTask })
 }
