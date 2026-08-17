@@ -6,6 +6,7 @@ import YAML from 'yaml';
 import swaggerUi from 'swagger-ui-express';
 import { metaRouter } from './routes/meta.routes.js';
 import { tasksRouter } from './routes/tasks.routes.js';
+import { db } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
