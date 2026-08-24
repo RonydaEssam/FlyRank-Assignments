@@ -1,4 +1,4 @@
-# Task Connecting to the database (W2.A1)
+# Containerize the stack (W3.A3)
 
 A to-do list API built with Express and TypeScript, full CRUD, backed by a real SQLite database, with interactive docs via Swagger UI. Built for the FlyRank Backend Internship: Week 2 (A1: in-memory CRUD) and Week 3 (A2: persistent storage).
 
