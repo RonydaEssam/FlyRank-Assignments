@@ -17,3 +17,5 @@ Inspect it directly:
 ```bash
 docker exec -it taskdb psql -U postgres -d tasks
 ```
+
+> **Note (Windows):** if port 5432 is already in use by a local Postgres install, this project's `taskdb` container maps to host port **5433** instead. Update `DATABASE_URL` in your `.env` accordingly (see `.env.example` for the standard port 5432, used if you have no conflict).
