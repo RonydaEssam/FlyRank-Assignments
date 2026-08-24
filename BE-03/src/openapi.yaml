@@ -1,0 +1,88 @@
+openapi: 3.0.0
+info: 
+    title: API Task
+    descripton: A minimal CRUD API for managing a to-do list.
+    version: 1.0.0
+paths:
+    /tasks:
+        get:
+            summary: Returns a list of all tasks
+            responses:
+                '200':
+                    description: Array of tasks
+        post:
+            summary: Creates a new task
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properities:
+                                title:
+                                    type: string
+                            reuired:
+                                -   title
+            responses:
+                '201':
+                    description: Task created successfully
+                '400':
+                    description: Invalid or missing title
+    /tasks/{id}:
+        get:
+            summary: Gets a single task by id
+            parameters:
+                -   name: id
+                    in: path
+                    required: true
+                    schema:
+                        type: integer
+            responses:
+                '200':
+                    description: Task found
+                '404':
+                    description: Task not found
+        put:
+            sumaary: Update a task
+            parameters:
+                -   name: id
+                    in: path
+                    required: true
+                    schema:
+                        type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                title:
+                                    type: string
+                                done:
+                                    type: boolean
+            responses:
+                '200':
+                    description: Task updated
+                '400':
+                    description: Invalid body
+                '404':
+                    description: Task not found
+        delete:
+            summary: Delete a task
+            parameters:
+                -   name: id
+                    in: path
+                    required: true
+                    schema:
+                        type: integer
+            responses:
+                '204':
+                    description: Task deleted
+                '404':
+                    description: Task not found
+    /health:
+        get:
+            summary: Health check
+            responses:
+                '200':
+                    description: Server is alive
