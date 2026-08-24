@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { db } from "../db.js";
+import { pool as db } from "../db.js";
 
 interface Task {
     'id': number,

@@ -1,22 +1,36 @@
-import Database from "better-sqlite3";
+import { configDotenv } from 'dotenv';
+import 'dotenv/config';
+import { Pool } from 'pg';
 
-const db: Database.Database = new Database('tasks.db');
+configDotenv();
 
-db.exec(`
-    CREATE TABLE IF NOT EXISTS tasks(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    done INTEGER NOT NULL DEFAULT 0
-)
-`);
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+});
 
-const row = db.prepare('SELECT COUNT(*) as count FROM tasks').get() as { count: number };
+async function init() {
+    await pool.query(`
+    CREATE TABLE IF NOT EXISTS tasks (
+      id SERIAL PRIMARY KEY,
+      title TEXT NOT NULL,
+      done BOOLEAN NOT NULL DEFAULT false
+    )
+  `);
 
-if (row.count === 0) {
-    const seed = db.prepare('INSERT INTO tasks (title, done) VALUES (?, ?)');
-    seed.run('Prepare working environment', 1);
-    seed.run('Create first endpoint', 1);
-    seed.run('Update endpoint', 0);
+    const { rows } = await pool.query('SELECT COUNT(*) FROM tasks');
+    const count = Number(rows[0].count);
+
+    if (count === 0) {
+        await pool.query(
+            'INSERT INTO tasks (title, done) VALUES ($1, $2), ($3, $4), ($5, $6)',
+            ['Prepare working environment', true, 'Create first endpoint', true, 'Update endpoint', false]
+        );
+    }
 }
 
-export { db };
+init().catch((err) => {
+    console.error('Failed to initialize database:', err);
+    process.exit(1);
+});
+
+export { pool };
