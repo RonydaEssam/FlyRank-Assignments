@@ -13,22 +13,21 @@ const tasks: Task[] = [
     { id: 3, title: 'Update endpoint', done: false }
 ]
 
-let nextId = 4;
-
-const getAllTasks = (req: Request, res: Response) => {
-    const data = db.prepare('SELECT * FROM tasks').all();
-    res.status(200).json({ tasks: data })
+const getAllTasks = async (req: Request, res: Response) => {
+    const data = await db.query('SELECT * FROM tasks');
+    res.status(200).json({ tasks: data.rows })
 }
 
-const getTask = (req: Request, res: Response) => {
+const getTask = async (req: Request, res: Response) => {
     const id = Number(req.params.id);
-    const data = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+    const data = await db.query('SELECT * FROM tasks WHERE id = $1', [id]);
+    const task = data.rows[0];
 
-    if (!data) {
+    if (!task) {
         return res.status(404).json({ error: `Task with id (${id}) not found.` })
     }
 
-    res.status(200).json({ data })
+    res.status(200).json({ task })
 }
 
 const createTask = (req: Request, res: Response) => {
