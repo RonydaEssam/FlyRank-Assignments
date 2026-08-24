@@ -30,24 +30,27 @@ const getTask = async (req: Request, res: Response) => {
     res.status(200).json({ task })
 }
 
-const createTask = (req: Request, res: Response) => {
+const createTask = async (req: Request, res: Response) => {
     const { title } = req.body;
 
     if (!title || title.trim() === '' || typeof title !== 'string') {
         return res.status(400).json({ error: 'Title is required and must not be empty.' })
     }
 
-    const insert = db.prepare('INSERT INTO tasks (title, done) VALUES (?, ?)');
-    const result = insert.run(title, 0);
+    const result = await db.query(
+        'INSERT INTO tasks (title, done) VALUES ($1, $2) RETURNING *',
+        [title, false]
+    );
 
-    const newTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(result.lastInsertRowid)
+    const newTask = result.rows[0];
 
     res.status(201).json({ message: 'Task created successfully.', task: newTask })
 }
 
-const updateTask = (req: Request, res: Response) => {
+const updateTask = async (req: Request, res: Response) => {
     const id = Number(req.params.id);
-    const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Task | undefined;
+    const taskData = await db.query('SELECT * FROM tasks WHERE id = $1', [id]);
+    const task: Task | undefined = taskData.rows[0];
 
     if (!task) {
         return res.status(404).json({ error: `Task with id (${id}) not found.` })
@@ -65,22 +68,22 @@ const updateTask = (req: Request, res: Response) => {
     const newTitle = title !== undefined ? title : task.title;
     const newDone = done !== undefined ? (done ? 1 : 0) : task.done;
 
-    db.prepare('UPDATE tasks SET title = ?, done = ? WHERE id = ?').run(newTitle, newDone, id);
-
-    const updatedTask = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+    const result = await db.query(
+        'UPDATE tasks SET title = $1, done = $2 WHERE id = $3 RETURNING *',
+        [newTitle, newDone, id]
+    );
+    const updatedTask = result.rows[0];
 
     res.status(200).json({ message: 'Task updated successfully.', updatedTask })
 }
 
-const deleteTask = (req: Request, res: Response) => {
+const deleteTask = async (req: Request, res: Response) => {
     const id = Number(req.params.id);
-    const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+    const task = await db.query('Delete FROM tasks WHERE id = $1', [id]);
 
-    if (!task) {
+    if (task.rowCount === 0) {
         return res.status(404).json({ error: `Task with id (${id}) not found` });
     }
-
-    db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
 
     res.status(204).send();
 }
