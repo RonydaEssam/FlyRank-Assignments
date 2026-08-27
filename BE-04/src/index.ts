@@ -7,6 +7,9 @@ import swaggerUi from 'swagger-ui-express';
 import { metaRouter } from './routes/meta.routes.js';
 import { tasksRouter } from './routes/tasks.routes.js';
 import './db.js';
+import './supabase.js';
+
+console.log('Connected to Supabase');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
