@@ -9,6 +9,7 @@ import { tasksRouter } from './routes/tasks.routes.js';
 import { authRouter } from './routes/auth.routes.js';
 import './db.js';
 import './supabase.js';
+import { protectedProfile, publicInfo } from './handlers/auth.js';
 
 console.log('Connected to Supabase');
 
@@ -28,6 +29,8 @@ app.use('/docs', swaggerUi.serve, swaggerUi.setup(openapiSpec));
 app.use('/', metaRouter);
 app.use('/', tasksRouter);
 app.use('/auth', authRouter);
+app.get('/public/info', publicInfo);
+app.get('/protected/profile', protectedProfile);
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`)

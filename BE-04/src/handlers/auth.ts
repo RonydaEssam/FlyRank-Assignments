@@ -36,4 +36,21 @@ const login = async (req: Request, res: Response) => {
     });
 }
 
-export { signup, login };
+const publicInfo = (req: Request, res: Response) => {
+    res.status(200).json({ message: 'Welcome stranger! This info is public.' });
+}
+
+const protectedProfile = (req: Request, res: Response) => {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.split(' ')[1] === '') {
+        return res.status(401).json({ error: 'Access token required' });
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    // Not verifying the token yet, that's Stage 3.
+    res.status(200).json({ message: 'Token received (not yet verified)' });
+}
+
+export { signup, login, publicInfo, protectedProfile };
