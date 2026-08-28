@@ -6,6 +6,7 @@ import YAML from 'yaml';
 import swaggerUi from 'swagger-ui-express';
 import { metaRouter } from './routes/meta.routes.js';
 import { tasksRouter } from './routes/tasks.routes.js';
+import { authRouter } from './routes/auth.routes.js';
 import './db.js';
 import './supabase.js';
 
@@ -26,6 +27,7 @@ app.use('/docs', swaggerUi.serve, swaggerUi.setup(openapiSpec));
 
 app.use('/', metaRouter);
 app.use('/', tasksRouter);
+app.use('/auth', authRouter);
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`)
