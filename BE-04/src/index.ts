@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { type Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -9,7 +9,8 @@ import { tasksRouter } from './routes/tasks.routes.js';
 import { authRouter } from './routes/auth.routes.js';
 import './db.js';
 import './supabase.js';
-import { protectedProfile, publicInfo } from './handlers/auth.js';
+import { requireAuth, type AuthenticatedRequest } from './middleware/auth.middleware.js';
+import { signup, login, publicInfo, protectedProfile, logout } from './handlers/auth.js';
 
 console.log('Connected to Supabase');
 
@@ -29,8 +30,13 @@ app.use('/docs', swaggerUi.serve, swaggerUi.setup(openapiSpec));
 app.use('/', metaRouter);
 app.use('/', tasksRouter);
 app.use('/auth', authRouter);
+
 app.get('/public/info', publicInfo);
-app.get('/protected/profile', protectedProfile);
+app.get('/protected/profile', requireAuth, protectedProfile);
+app.post('/auth/logout', requireAuth, logout);
+app.get('/protected/dashboard', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+    res.status(200).json({ message: `Welcome to your dashboard, ${req.user?.email}` });
+});
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`)
