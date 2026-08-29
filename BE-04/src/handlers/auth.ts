@@ -40,7 +40,7 @@ const publicInfo = (req: Request, res: Response) => {
     res.status(200).json({ message: 'Welcome stranger! This info is public.' });
 }
 
-const protectedProfile = (req: Request, res: Response) => {
+const protectedProfile = async (req: Request, res: Response) => {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.split(' ')[1] === '') {
@@ -49,8 +49,17 @@ const protectedProfile = (req: Request, res: Response) => {
 
     const token = authHeader.split(' ')[1];
 
-    // Not verifying the token yet, that's Stage 3.
-    res.status(200).json({ message: 'Token received (not yet verified)' });
+    const { data, error } = await supabase.auth.getUser(token);
+
+    if (error || !data.user) {
+        return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    res.status(200).json({
+        id: data.user.id,
+        email: data.user.email,
+        created_at: data.user.created_at
+    });
 }
 
 export { signup, login, publicInfo, protectedProfile };
