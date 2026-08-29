@@ -130,3 +130,4 @@ A few real issues hit while building the containerized version, kept here in cas
 **A1 → A2 → A3:** the API's routes, request/response shapes, and status codes stayed unchanged across all three storage swaps, from an in-memory array, to a SQLite file, to a full Postgres server in Docker. This is the core lesson of the series: the API is the promise, the database is where the promise is kept, and clients never notice the difference underneath.
 
 All CRUD operations use parameterized queries (`$1`, `$2`, ...), user input is never glued directly into SQL strings. -->
+![SwaggerUI authorized](swagger_auth.png)
