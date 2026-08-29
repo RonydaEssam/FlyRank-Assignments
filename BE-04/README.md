@@ -1,133 +1,122 @@
 # Auth - Login & protect (W4.A4)
 
-<!-- ## Database (Postgres via Docker)
-
-A to-do list API built with Express and TypeScript — full CRUD, backed by a containerized PostgreSQL database, with interactive docs via Swagger UI. Built for the FlyRank Backend Internship: Week 2 (A1: in-memory CRUD), Week 3 (A2: SQLite), and (A3: Postgres in Docker).
-
-This assignment moves task storage from SQLite to a containerized PostgreSQL database.
+A to-do list API built with Express and TypeScript, full CRUD backed by containerized PostgreSQL, and now secured with Supabase Auth: sign up, log in, log out, and route-level protection via verified JWTs. Built for the FlyRank Backend Internship, Week 4, Assignment A4.
 
 ## What this is
 
-A REST API that manages a list of tasks. Supports the four CRUD operations:
+On top of the existing task CRUD API, this adds:
 
-- **Create** a task
-- **Read** all tasks or a single task
-- **Update** a task
-- **Delete** a task
+- **Sign up** and **log in** via Supabase Auth (email + password)
+- **JWT verification** on protected routes, no request reaches protected logic without a valid, unexpired token
+- **Reusable auth middleware** one guard function protects any route it's applied to
+- **Log out**
+- A clear split between **public** routes (open to anyone) and **protected** routes (require a valid bearer token)
 
-As of A3, tasks are stored in a PostgreSQL database running in a Docker container. The whole stack, app and database, starts with a single command: `docker compose up`.
+Supabase handles all password hashing and token signing, this project never touches a raw password or implements any cryptography itself.
 
-## How to run it (one command)
+## How to run it
 
 ```bash
-git clone https://github.com/RonydaEssam/FlyRank-Assignments.git
-cd assignments/BE-03
+git clone https://github.com/RonydaEssam/FlyRank-Assignments
+cd assignments/BE-04
 
 cp .env.example .env
+# then fill in your own Supabase project URL, anon key, and DB connection string in .env
+
 docker compose up
 ```
 
-The API is available at `http://localhost:3000`. The database, table, and 3 seed tasks are created automatically on first run.
+The API is available at `http://localhost:3000`.
+
+## Setting up your own Supabase project
+
+1. Create a free project at [supabase.com](https://supabase.com)
+2. In **Project Settings → API**, copy your **Project URL** and **`anon` public key** (never the `service_role` key)
+3. In **Authentication → Sign In / Providers → Email**, turn off "Confirm email" for local testing (a fresh signup can then log in immediately without clicking an email link)
+4. Paste your URL and key into `.env` (see `.env.example` for the required keys)
 
 ## Environment variables
 
-See `.env.example` for the required keys. `.env` is git-ignored and never committed, copy `.env.example` to `.env` before running.
-
 ```
-DATABASE_URL=postgres://postgres:dev@localhost:5432/tasks
+SUPABASE_URL=your_project_url
+SUPABASE_KEY=your_anon_key
+PORT=3000
+DATABASE_URL=postgres://postgres:dev@db:5432/tasks
 ```
 
-> **Note (Windows):** if you're running the database standalone (outside Compose) and port 5432 is already taken by a local Postgres install, remap the container to a free host port (e.g. `5433`) and update `DATABASE_URL` in `.env` to match. Inside Docker Compose this isn't an issue — containers reach each other by service name (`db`) on their own internal network, regardless of what's running on your host machine.
+`.env` is git-ignored and never committed. `.env.example` holds the same keys with placeholder values.
 
-## Project structure
-
-```
-BE-03/
-├── src/
-│   ├── handlers/        # request handlers (business logic)
-│   │   ├── tasks.ts
-│   │   └── meta.ts
-│   ├── routes/          # route definitions
-│   │   ├── tasks.routes.ts
-│   │   └── meta.routes.ts
-│   ├── middleware/
-│   ├── db.ts             # Postgres connection, schema, seeding
-│   ├── openapi.yaml
-│   └── index.ts           # app entry point
-├── Dockerfile
-├── compose.yaml
-├── .env.example
-├── package.json
-└── tsconfig.json
-```
+> **Security note:** Supabase keys leaked to a public repo get scraped by bots within minutes. Double-check `.env` never appears in `git log` before pushing.
 
 ## Endpoints
 
-| Method | Route | Description | Success | Errors |
-|--------|-------|-------------|---------|--------|
-| GET | `/` | API description | 200 | — |
-| GET | `/health` | Health check | 200 | — |
-| GET | `/tasks` | List all tasks | 200 | — |
-| GET | `/tasks/:id` | Get a single task | 200 | 404 if not found |
-| POST | `/tasks` | Create a task | 201 | 400 if title missing/empty |
-| PUT | `/tasks/:id` | Update a task | 200 | 400 invalid body, 404 not found |
-| DELETE | `/tasks/:id` | Delete a task | 204 | 404 if not found |
+| Method | Route | Auth required | Description | Success | Errors |
+|--------|-------|:---:|-------------|---------|--------|
+| POST | `/auth/signup` | No | Create a new account | 201 | 400 missing fields |
+| POST | `/auth/login` | No | Log in, get access + refresh tokens | 200 | 400 missing fields, 401 invalid credentials |
+| POST | `/auth/logout` | **Yes** | End the session | 204 | 401 missing/invalid token |
+| GET | `/public/info` | No | Open, public data | 200 | — |
+| GET | `/protected/profile` | **Yes** | Authenticated user's profile | 200 | 401 missing/invalid token |
+| GET | `/protected/dashboard` | **Yes** | Example second protected route (same guard) | 200 | 401 missing/invalid token |
+| GET | `/tasks`, etc. | No | Existing CRUD task endpoints (see A1–A3) | — | — |
 
-Each error returns a JSON body, e.g. `{ "error": "Task with id (99) not found." }`.
+Protected routes expect `Authorization: Bearer <access_token>`.
 
-## Example request
+## Example: full auth flow
 
 ```bash
-curl -i -X POST http://localhost:3000/tasks -H "Content-Type: application/json" -d "{\"title\":\"Persistence check 3\"}"
+# 1. Sign up
+curl -i -X POST http://localhost:3000/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"password123"}'
+
+# 2. Log in
+curl -i -X POST http://localhost:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"password123"}'
+# copy the access_token from the response
+
+# 3. Access a protected route
+curl -i http://localhost:3000/protected/dashboard \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
 ```
 
 ```
-HTTP/1.1 201 Created
+HTTP/1.1 200 OK
 X-Powered-By: Express
 Content-Type: application/json; charset=utf-8
-Content-Length: 99
-ETag: W/"63-80kObKsTabLgDmVVQaBvzL2YN4A"
-Date: Tue, 25 Aug 2026 13:09:56 GMT
+Content-Length: 57
+ETag: W/"39-6WG7m4yy1hTqV3npbqlr5sLDFX8"
+Date: Sat, 29 Aug 2026 17:55:04 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
-{"message":"Task created successfully.","task":{"id":5,"title":"Persistence check 3","done":false}}
+{"message":"Welcome to your dashboard, test@example.com"}
 ```
 
 ## Swagger UI
 
-Interactive docs are served at `/docs`. Full CRUD cycle (create, list, update, delete) was tested there via "Try it out".
+Interactive docs are served at `/docs`. Protected routes show a lock icon, click **Authorize**, paste an access token, and use "Try it out" directly from the browser.
 
-![Swagger UI screenshot](swagger-ui.png)
-
-## Data in the database
-
-A screenshot of the seeded/created data, viewed with `psql` or a GUI tool (DBeaver, pgAdmin, TablePlus):
-
-![Database screenshot](database.png)
+![SwaggerUI authorized](swagger_auth.png)
 
 ## Tech stack
 
-- TypeScript
-- Express
-- PostgreSQL 16, running in Docker
-- `pg` (node-postgres) — Postgres driver
+- TypeScript, Express
+- Supabase Auth (`@supabase/supabase-js`): identity provider, JWT issuing and verification
+- PostgreSQL 16 in Docker: task storage (unrelated to auth; see A3)
 - Docker + Docker Compose
-- swagger-ui-express + a hand-written OpenAPI (YAML) spec
+- swagger-ui-express + OpenAPI (YAML), with a `bearerAuth` security scheme
 
-## Troubleshooting notes (things that tripped me up building this)
+## How the auth flow works
 
-A few real issues hit while building the containerized version, kept here in case they help someone else (or future me):
+1. Client sends email/password to `/auth/signup` or `/auth/login`, these forward directly to Supabase, which hashes/checks the password and returns a signed JWT.
+2. Client attaches that JWT to future requests: `Authorization: Bearer <token>`.
+3. Protected routes run through `requireAuth` middleware first, which asks Supabase (`supabase.auth.getUser(token)`) whether the token is genuinely valid, this is a real network call, so a tampered or expired token is caught immediately.
+4. Only if Supabase confirms the token does the middleware call `next()` and let the actual route handler run, with the verified user attached to `req.user`.
 
-- **`Dockerfile` is case-sensitive.** Windows Explorer hides this, since it's case-insensitive — a file named `DockerFile` looks identical to `Dockerfile` in the file browser, but Docker's build engine (Linux-based) only recognizes the exact lowercase-`f` spelling and fails with a "no such file or directory" error otherwise.
-- **`postgres:18+` changed its internal data directory layout** (`pg_ctlcluster`-compatible, version-specific paths). Mounting a volume the classic way (`/var/lib/postgresql/data`) fails on 18+. Pinned to `postgres:16` to avoid this entirely.
-- **A local Postgres install running as a Windows service can silently squat on port 5432**, intercepting connections meant for a Docker container mapped to the same port — even though `docker ps` shows the container as healthy. `netstat -ano | findstr :5432` plus `tasklist /FI "PID eq <pid>"` will reveal a second, non-Docker process on the port if this happens.
-- **`dotenv.config()` must run *before* anything reads `process.env`** — an early debug log or Pool initialization placed above the `.config()` call will see `undefined`, even though the `.env` file itself is correct.
-- **A missing `volumes:` block on the `db` service in `compose.yaml` means Postgres has nowhere persistent to write** — data survives while the container is running, but is wiped the instant `docker compose down` removes the container. YAML indentation matters here: `volumes:` must sit at the same level as `image:`/`environment:` under the service, and the named-volume declaration (`taskdata:`) must be a top-level key, not nested inside `services:`.
+This project never stores, hashes, or verifies passwords itself, that's Supabase's job entirely.
 
 ## Notes
 
-**A1 → A2 → A3:** the API's routes, request/response shapes, and status codes stayed unchanged across all three storage swaps, from an in-memory array, to a SQLite file, to a full Postgres server in Docker. This is the core lesson of the series: the API is the promise, the database is where the promise is kept, and clients never notice the difference underneath.
-
-All CRUD operations use parameterized queries (`$1`, `$2`, ...), user input is never glued directly into SQL strings. -->
-![SwaggerUI authorized](swagger_auth.png)
+**A1 → A2 → A3 → A4:** the task CRUD endpoints and their storage (Postgres in Docker) are unchanged from A3. This assignment adds an entirely separate concern (authentication) on top, without touching the existing task logic. The one new architectural piece, the `requireAuth` middleware, is reusable across any future protected route with zero duplicated code.
