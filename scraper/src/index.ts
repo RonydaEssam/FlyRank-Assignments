@@ -12,11 +12,17 @@ function sleep(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchPage(url: string, cachePath: string): Promise<{ html: string; fromCache: boolean }> {
+interface FetchResult {
+    html: string | null;
+    fromCache: boolean;
+    error: string | null;
+}
+
+async function fetchPage(url: string, cachePath: string, retried = false): Promise<FetchResult> {
     if (existsSync(cachePath)) {
         const html = await readFile(cachePath, 'utf-8');
         console.log(`CACHE HIT — ${url} (${html.length} bytes)`);
-        return { html, fromCache: true };
+        return { html, fromCache: true, error: null };
     }
 
     const controller = new AbortController();
@@ -30,8 +36,18 @@ async function fetchPage(url: string, cachePath: string): Promise<{ html: string
 
         clearTimeout(timeout);
 
+        if (response.status === 404 || response.status === 403) {
+            return { html: null, fromCache: false, error: `status ${response.status}` };
+        }
+
+        if (response.status >= 500 && !retried) {
+            console.log(`RETRY — ${url} (got ${response.status})`);
+            await sleep(1000);
+            return fetchPage(url, cachePath, true);
+        }
+
         if (response.status !== 200) {
-            throw new Error(`Fetch failed for ${url}: status ${response.status}`);
+            return { html: null, fromCache: false, error: `status ${response.status}` };
         }
 
         const html = await response.text();
@@ -40,10 +56,17 @@ async function fetchPage(url: string, cachePath: string): Promise<{ html: string
 
         await sleep(DELAY_MS);
 
-        return { html, fromCache: false };
+        return { html, fromCache: false, error: null };
     } catch (err) {
         clearTimeout(timeout);
-        throw err;
+
+        if (!retried) {
+            console.log(`RETRY — ${url} (${(err as Error).message})`);
+            await sleep(1000);
+            return fetchPage(url, cachePath, true);
+        }
+
+        return { html: null, fromCache: false, error: (err as Error).message };
     }
 }
 
@@ -58,7 +81,7 @@ async function discoverBookUrls(): Promise<Map<string, string>> {
         const { html } = await fetchPage(pageUrl, cachePath);
 
         const currentPageUrl = pageUrl;
-        const $ = cheerio.load(html);
+        const $ = cheerio.load(html || '');
 
         $('article.product_pod h3 a').each((_, el) => {
             const href = $(el).attr('href');
@@ -158,9 +181,14 @@ function cachePathForBook(url: string): string {
     return `${CACHE_DIR}/book-${slug}.html`;
 }
 
-async function extractBookRecord(url: string, sourcePage: string): Promise<RawRecord> {
+async function extractBookRecord(url: string, sourcePage: string): Promise<RawRecord | null> {
     const cachePath = cachePathForBook(url);
-    const { html } = await fetchPage(url, cachePath);
+    const { html, error } = await fetchPage(url, cachePath);
+
+    if (error || !html) {
+        console.log(`SKIPPED — ${url} (${error})`);
+        return null;
+    }
 
     const $ = cheerio.load(html);
     const product = $('.product_page');
@@ -172,7 +200,7 @@ async function extractBookRecord(url: string, sourcePage: string): Promise<RawRe
     const ratingClasses = product.find('p.star-rating').attr('class') || '';
     const rating_text = ratingClasses.replace('star-rating', '').trim();
 
-    const descriptionEl = $('#product_description').next('p');
+    const descriptionEl = $('#product_description').next('p').first();
     const description = descriptionEl.length ? descriptionEl.text().trim() : null;
 
     return {
@@ -187,33 +215,61 @@ async function extractBookRecord(url: string, sourcePage: string): Promise<RawRe
     };
 }
 
-async function extractAllBooks(bookUrls: string[], catalogueUrls: Map<string, string>): Promise<RawRecord[]> {
+async function extractAllBooks(bookUrls: string[], catalogueUrls: Map<string, string>): Promise<{ records: RawRecord[]; failedPages: number }> {
     const records: RawRecord[] = [];
+    let failedPages = 0;
 
     for (const url of bookUrls) {
         const sourcePage = catalogueUrls.get(url) || 'unknown';
         const record = await extractBookRecord(url, sourcePage);
-        records.push(record);
+
+        if (record) {
+            records.push(record);
+        } else {
+            failedPages++;
+        }
     }
 
-    console.log(`detail_pages=${records.length}`);
+    console.log(`detail_pages=${records.length} failed_pages=${failedPages}`);
 
-    return records;
+    return { records, failedPages };
 }
 
 async function main() {
+    const startTime = Date.now();
+    const startedAt = new Date().toISOString();
+
     await mkdir(CACHE_DIR, { recursive: true });
     await mkdir('output', { recursive: true });
 
     const bookUrlMap = await discoverBookUrls();
-    const rawRecords = await extractAllBooks([...bookUrlMap.keys()], bookUrlMap);
+
+    // Deliberately inject one fake URL to prove failure handling, remove before final submission,
+    // or keep behind a flag if you want to demonstrate it on demand.
+    bookUrlMap.set('https://books.toscrape.com/catalogue/this-book-does-not-exist_9999/index.html', 'test');
+
+    const { records: rawRecords, failedPages } = await extractAllBooks([...bookUrlMap.keys()], bookUrlMap);
 
     const { valid, invalid } = validateRecords(rawRecords);
 
     await writeFile('output/books.json', JSON.stringify(valid, null, 2), 'utf-8');
     await writeFile('output/errors.json', JSON.stringify(invalid, null, 2), 'utf-8');
 
-    console.log(`valid_records=${valid.length} invalid_records=${invalid.length}`);
+    const durationMs = Date.now() - startTime;
+
+    const report = {
+        started_at: startedAt,
+        duration_ms: durationMs,
+        pages_fetched: bookUrlMap.size + 3,
+        valid_records: valid.length,
+        invalid_records: invalid.length,
+        failed_pages: failedPages
+    };
+
+    await writeFile('output/run-report.json', JSON.stringify(report, null, 2), 'utf-8');
+
+    console.log(`valid_records=${valid.length} invalid_records=${invalid.length} failed_pages=${failedPages}`);
+    console.log('Run report:', report);
 }
 
 main().catch((err) => {
