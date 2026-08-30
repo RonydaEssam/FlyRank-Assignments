@@ -1,6 +1,7 @@
 import { writeFile, readFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import * as cheerio from 'cheerio';
+import { z } from 'zod';
 
 const USER_AGENT = 'FlyRankInternshipA9/1.0 (+https://github.com/<your-username>/flyrank-internship)';
 const TIMEOUT_MS = 8000;
@@ -96,6 +97,61 @@ interface RawRecord {
     fetched_at: string;
 }
 
+const BookSchema = z.object({
+    title: z.string().min(1),
+    product_url: z.string().url(),
+    price_gbp: z.number().positive(),
+    price_text: z.string(),
+    availability_text: z.string(),
+    rating_text: z.string(),
+    description: z.string().nullable(),
+    source_page: z.string().url(),
+    fetched_at: z.string()
+});
+
+type Book = z.infer<typeof BookSchema>;
+
+function normalizeRecord(raw: RawRecord): unknown {
+    const priceMatch = raw.price_text.match(/[\d.]+/);
+    const price_gbp = priceMatch ? parseFloat(priceMatch[0]) : NaN;
+
+    return {
+        ...raw,
+        price_gbp
+    };
+}
+
+interface ValidationResult {
+    valid: Book[];
+    invalid: { record: unknown; reason: string }[];
+}
+
+function validateRecords(rawRecords: RawRecord[]): ValidationResult {
+    const valid: Book[] = [];
+    const invalid: { record: unknown; reason: string }[] = [];
+    const seenUrls = new Set<string>();
+
+    for (const raw of rawRecords) {
+        const normalized = normalizeRecord(raw);
+        const result = BookSchema.safeParse(normalized);
+
+        if (!result.success) {
+            invalid.push({ record: normalized, reason: result.error.issues.map(i => i.message).join('; ') });
+            continue;
+        }
+
+        if (seenUrls.has(result.data.product_url)) {
+            invalid.push({ record: normalized, reason: 'Duplicate product_url' });
+            continue;
+        }
+
+        seenUrls.add(result.data.product_url);
+        valid.push(result.data);
+    }
+
+    return { valid, invalid };
+}
+
 function cachePathForBook(url: string): string {
     const segments = url.split('/').filter(Boolean);
     const slug = segments[segments.length - 2] || 'unknown';
@@ -147,11 +203,17 @@ async function extractAllBooks(bookUrls: string[], catalogueUrls: Map<string, st
 
 async function main() {
     await mkdir(CACHE_DIR, { recursive: true });
+    await mkdir('output', { recursive: true });
 
     const bookUrlMap = await discoverBookUrls();
-    const records = await extractAllBooks([...bookUrlMap.keys()], bookUrlMap);
+    const rawRecords = await extractAllBooks([...bookUrlMap.keys()], bookUrlMap);
 
-    console.log(JSON.stringify(records[0], null, 2));
+    const { valid, invalid } = validateRecords(rawRecords);
+
+    await writeFile('output/books.json', JSON.stringify(valid, null, 2), 'utf-8');
+    await writeFile('output/errors.json', JSON.stringify(invalid, null, 2), 'utf-8');
+
+    console.log(`valid_records=${valid.length} invalid_records=${invalid.length}`);
 }
 
 main().catch((err) => {
