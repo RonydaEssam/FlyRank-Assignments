@@ -22,7 +22,9 @@ Stack is not stricted by FlyRank, this is the stack I will be using.
 | BE-01 | W2.A1 | CRUD API | ✅ Complete | [`/BE-01`](./BE-01) |
 | BE-02 | W3.A2 | Connecting to the database | ✅ Complete | [`/BE-02`](./BE-02) |
 | BE-03 | W3.A3 | Connecting to the database | ✅ Complete | [`/BE-03`](./BE-03) |
-| BE-04 | W.A | ... | 🚧 In progress | [`/BE-04`](./BE-04) |
+| BE-04 | W4.A4 | Authentication | ✅ Complete | [`/BE-04`](./BE-04) |
+| BE-05 | W5.A9 | The polite scraper | 🚧 In progress | [`/scraper`](./scraper) |
+
 
 *(Table updated as new tasks are completed.)*
 
